@@ -1,0 +1,35 @@
+# Dependencies & virtualenvs
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build outputs
+apps/web/dist/
+*.egg-info/
+dist/
+build/
+
+# Runtime data
+logs/*.jsonl
+logs/*.log
+*.log
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / tooling
+.commandcode/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Vite
+apps/web/.vite/

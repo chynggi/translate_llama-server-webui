@@ -1,0 +1,25 @@
+llama_server:
+  base_url: http://127.0.0.1:8080
+  api_key: ""
+  default_model: ""
+  request_timeout: 600
+
+paths:
+  glossary_dir: glossary
+  presets_dir: presets
+  prompts_dir: prompts
+  logs_dir: logs
+  cache_dir: cache
+
+server:
+  host: 127.0.0.1
+  port: 8000
+  cors_origins:
+    - http://localhost:5173
+    - http://127.0.0.1:5173
+    - http://localhost:3000
+    - http://127.0.0.1:3000
+
+detector:
+  min_alias_length: 2
+  longest_match_first: true

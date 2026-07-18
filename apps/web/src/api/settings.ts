@@ -1,0 +1,39 @@
+import { apiFetch } from "./client";
+
+export interface PublicSettings {
+  llama_server: {
+    base_url: string;
+    default_model: string;
+    request_timeout: number;
+    api_key_set: boolean;
+  };
+  detector: {
+    min_alias_length: number;
+    longest_match_first: boolean;
+  };
+}
+
+export interface SettingsUpdate {
+  llama_server?: {
+    base_url?: string;
+    api_key?: string;
+    default_model?: string;
+    request_timeout?: number;
+  };
+  detector?: {
+    min_alias_length?: number;
+    longest_match_first?: boolean;
+  };
+  persist?: boolean;
+}
+
+export function getSettings(): Promise<PublicSettings> {
+  return apiFetch<PublicSettings>("/settings");
+}
+
+export function updateSettings(body: SettingsUpdate): Promise<PublicSettings> {
+  return apiFetch<PublicSettings>("/settings", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}

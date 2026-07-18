@@ -1,0 +1,11 @@
+id: bluearchive
+name: Blue Archive
+description: Japanese-to-Korean translation preset tuned for Blue Archive dialogue.
+style: |
+  - 캐릭터의 말투와 존칭/반말은 관계와 성격에 맞게 자연스럽게 유지한다.
+  - 게임 대사 특유의 가벼운 톤을 살리고, 의성어·의태어는 한국어 표현으로 자연스럽게 옮긴다.
+  - 고유명사(인물·지명·조직·아이템)는 반드시 아래 용어집 표기를 따른다.
+user_instruction: |
+  다음 일본어 원문을 한국어로 번역하라. 용어집의 고유명사 표기를 반드시 지키고, 문체와 말투를 자연스럽게 유지하라. 번역문만 출력하라.
+temperature: 0.3
+max_tokens: 2048
