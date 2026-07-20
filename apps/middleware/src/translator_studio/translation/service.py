@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, AsyncIterator
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..config import Settings
 from ..detector.service import DetectedGlossary, DetectorService
@@ -26,6 +26,8 @@ class TranslateResult(BaseModel):
     model: str
     preset: str
     tokens: dict
+    reasoning_content: str = ""
+    timings: dict = Field(default_factory=dict)
 
 
 class TranslationService:
@@ -77,6 +79,9 @@ class TranslationService:
             "messages": assembled.messages,
             "stream": stream,
         }
+        # Precedence (lowest to highest): server generation defaults ->
+        # preset params -> per-request params.
+        payload.update(self._settings.generation.to_payload_params())
         payload.update(assembled.params)
         if params:
             payload.update(params)
@@ -117,6 +122,8 @@ class TranslationService:
             model=payload["model"],
             preset=preset.id,
             tokens=tokens,
+            reasoning_content=self._extract_reasoning(response),
+            timings=response.get("timings") or {},
         )
 
     async def translate_stream(
@@ -137,7 +144,9 @@ class TranslationService:
             return
         payload = self._payload(assembled, params, stream=True)
         raw_parts: list[str] = []
+        reasoning_parts: list[str] = []
         usage: dict = {}
+        timings: dict = {}
         try:
             async for line in self._llama.chat_completions_stream_lines(payload):
                 data = streamer.parse_sse_data(line)
@@ -151,6 +160,13 @@ class TranslationService:
                     continue
                 if chunk.get("usage"):
                     usage = chunk["usage"]
+                chunk_timings = streamer.extract_timings(chunk)
+                if chunk_timings:
+                    timings = chunk_timings
+                reasoning = streamer.extract_reasoning_delta(chunk)
+                if reasoning:
+                    reasoning_parts.append(reasoning)
+                    yield streamer.encode_sse({"type": "reasoning", "content": reasoning})
                 delta = streamer.extract_delta(chunk)
                 if delta:
                     raw_parts.append(delta)
@@ -179,6 +195,8 @@ class TranslationService:
                     "model": payload["model"],
                     "preset": preset.id,
                     "tokens": tokens,
+                    "reasoning_content": "".join(reasoning_parts),
+                    "timings": timings,
                 },
                 event="done",
             )
@@ -224,12 +242,27 @@ class TranslationService:
         )
         payload = {k: v for k, v in body.items() if k != "messages"}
         payload["messages"] = assembled.messages
-        payload.update(assembled.params)
+        # Precedence: generation defaults -> preset params -> caller body.
+        defaults = self._settings.generation.to_payload_params()
+        defaults.update(assembled.params)
+        for key, value in defaults.items():
+            payload.setdefault(key, value)
         return payload
 
     def _extract_content(self, response: dict) -> str:
         try:
             return (response.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        except (IndexError, AttributeError):
+            return ""
+
+    def _extract_reasoning(self, response: dict) -> str:
+        try:
+            return (
+                (response.get("choices") or [{}])[0]
+                .get("message", {})
+                .get("reasoning_content")
+                or ""
+            )
         except (IndexError, AttributeError):
             return ""
 

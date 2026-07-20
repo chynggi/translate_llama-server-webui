@@ -10,6 +10,7 @@ paths:
   prompts_dir: prompts
   logs_dir: logs
   cache_dir: cache
+  conversations_dir: conversations
 
 server:
   host: 127.0.0.1
@@ -23,3 +24,14 @@ server:
 detector:
   min_alias_length: 2
   longest_match_first: true
+
+# llama.cpp sampling defaults (adopted from llama webui settings export).
+# null / missing keys are not sent; preset and per-request values win.
+generation:
+  repeat_penalty: 1.15
+
+# Behaviour flags for conversational chat.
+chat:
+  enable_thinking: false
+  exclude_reasoning_from_context: false
+  system_prompt_file: chat_system.md

@@ -26,6 +26,8 @@ def _public_settings(settings: Settings) -> dict:
             "min_alias_length": settings.detector.min_alias_length,
             "longest_match_first": settings.detector.longest_match_first,
         },
+        "generation": settings.generation.model_dump(),
+        "chat": settings.chat.model_dump(),
     }
 
 
@@ -48,6 +50,18 @@ def _persist_settings(settings: Settings, path: Path = DEFAULT_CONFIG_PATH) -> N
     detector = data.setdefault("detector", CommentedMap())
     detector["min_alias_length"] = settings.detector.min_alias_length
     detector["longest_match_first"] = settings.detector.longest_match_first
+
+    generation = data.setdefault("generation", CommentedMap())
+    for key, value in settings.generation.model_dump().items():
+        if value is None:
+            generation.pop(key, None)  # keep the YAML free of cleared values
+        else:
+            generation[key] = value
+
+    chat = data.setdefault("chat", CommentedMap())
+    chat["enable_thinking"] = settings.chat.enable_thinking
+    chat["exclude_reasoning_from_context"] = settings.chat.exclude_reasoning_from_context
+    chat["system_prompt_file"] = settings.chat.system_prompt_file
 
     with path.open("w", encoding="utf-8") as f:
         yaml.dump(data, f)
@@ -89,6 +103,16 @@ async def update_settings(
             min_alias_length=settings.detector.min_alias_length,
             longest_match_first=settings.detector.longest_match_first,
         )
+
+    if req.generation:
+        # exclude_unset: only explicitly provided keys apply; explicit null clears.
+        for key, value in req.generation.model_dump(exclude_unset=True).items():
+            setattr(settings.generation, key, value)
+
+    if req.chat:
+        for key, value in req.chat.model_dump(exclude_unset=True).items():
+            if value is not None:
+                setattr(settings.chat, key, value)
 
     if llama_changed:
         await services.llama_client.reconfigure(

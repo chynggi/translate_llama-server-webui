@@ -24,6 +24,22 @@ def extract_delta(chunk: dict) -> str:
         return ""
 
 
+def extract_reasoning_delta(chunk: dict) -> str:
+    """Reasoning ("thinking") tokens streamed by llama-server as
+    ``delta.reasoning_content`` for reasoning models."""
+    try:
+        choice = (chunk.get("choices") or [{}])[0]
+        return (choice.get("delta") or {}).get("reasoning_content") or ""
+    except (AttributeError, IndexError, KeyError):
+        return ""
+
+
+def extract_timings(chunk: dict) -> dict:
+    """llama.cpp attaches a ``timings`` object to the final stream chunk."""
+    timings = chunk.get("timings")
+    return timings if isinstance(timings, dict) else {}
+
+
 def encode_sse(data: dict, event: str | None = None) -> bytes:
     payload = json.dumps(data, ensure_ascii=False)
     if event:

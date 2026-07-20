@@ -1,116 +1,133 @@
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { preview } from "../api/preview";
 import { getPresets } from "../api/presets";
-import { AppliedGlossary } from "../components/chat/AppliedGlossary";
-import { PageHeader } from "../components/layout/Sidebar";
-import { PromptPreviewPanel } from "../components/prompt/PromptPreviewPanel";
-import { useTranslateStream } from "../hooks/useTranslateStream";
-import type { PreviewResult } from "../types";
+import { ChatInput } from "../components/chat/ChatInput";
+import { ConversationList } from "../components/chat/ConversationList";
+import { Markdown } from "../components/chat/Markdown";
+import { MessageItem } from "../components/chat/MessageItem";
+import { ThinkingBlock } from "../components/chat/ThinkingBlock";
+import { useChatController } from "../hooks/useChatController";
+import { usePrefs } from "../theme/prefs";
+import { activePath } from "../utils/conversationTree";
 
 export function Chat() {
-  const [source, setSource] = useState("");
-  const [preset, setPreset] = useState("bluearchive");
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [promptResult, setPromptResult] = useState<PreviewResult | null>(null);
-  const [promptBusy, setPromptBusy] = useState(false);
-  const [promptError, setPromptError] = useState("");
-  const stream = useTranslateStream();
-  const presets = useQuery({ queryKey: ["presets"], queryFn: getPresets });
+  const {
+    conv,
+    preset,
+    setPreset,
+    busy,
+    streamContent,
+    streamReasoning,
+    sendError,
+    send,
+    regenerate,
+    editBranch,
+  } = useChatController();
+  const { prefs } = usePrefs();
+  const presetsQuery = useQuery({ queryKey: ["presets"], queryFn: getPresets });
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  async function openPrompt() {
-    if (!source.trim()) return;
-    setShowPrompt(true);
-    setPromptBusy(true);
-    setPromptError("");
+  const path = useMemo(
+    () => activePath(conv.messages, conv.session?.currNode),
+    [conv.messages, conv.session?.currNode]
+  );
+
+  // Auto-select the most recent conversation once the list arrives.
+  useEffect(() => {
+    if (!conv.activeId && conv.conversations.length > 0) {
+      void conv.select(conv.conversations[0].id);
+    }
+    // conv identity changes every render; only the list matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv.conversations]);
+
+  // Keep the latest exchange in view.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [path.length, streamContent, streamReasoning]);
+
+  async function handleImport(jsonl: string) {
     try {
-      const result = await preview({ source, preset });
-      // Prefer messages captured from the last translate stream when present.
-      setPromptResult(
-        stream.messages ? { ...result, messages: stream.messages } : result
-      );
+      await conv.importJsonl(jsonl);
     } catch (cause) {
-      setPromptError(cause instanceof Error ? cause.message : "Preview failed");
-    } finally {
-      setPromptBusy(false);
+      window.alert(
+        `가져오기 실패: ${cause instanceof Error ? cause.message : "알 수 없는 오류"}`
+      );
     }
   }
 
   return (
-    <>
-      <PageHeader
-        title="Translate"
-        detail="Translate a passage with only the glossary terms that appear in this request."
+    <section className="chat-shell">
+      <ConversationList
+        conversations={conv.conversations}
+        activeId={conv.activeId}
+        loading={conv.listLoading}
+        onSelect={(id) => void conv.select(id)}
+        onNew={() => void conv.createNew()}
+        onImport={handleImport}
+        onRename={(id, name) => void conv.rename(id, name)}
+        onDelete={(id) => void conv.remove(id)}
       />
-      <section className="workspace-grid">
-        <div className="panel editor-panel">
-          <div className="panel-head">
-            <span>Source text</span>
-            <span className="language-tag">Japanese</span>
-          </div>
-          <textarea
-            value={source}
-            onChange={(event) => setSource(event.target.value)}
-            placeholder="Paste Japanese dialogue or prose here..."
-          />
-          <div className="toolbar">
-            <label>
-              Preset{" "}
-              <select value={preset} onChange={(event) => setPreset(event.target.value)}>
-                {presets.data?.presets.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                )) ?? <option value="bluearchive">Blue Archive</option>}
-              </select>
-            </label>
-            <button
-              className="primary"
-              disabled={stream.busy || !source.trim()}
-              onClick={() => void stream.run({ source, preset })}
-            >
-              {stream.busy ? "Translating..." : "Translate"}
-            </button>
-          </div>
-          {stream.error && <p className="error">{stream.error}</p>}
-        </div>
-        <div className="panel output-panel">
-          <div className="panel-head">
-            <span>Translation</span>
-            <span className="language-tag">Korean</span>
-          </div>
-          <div className="output-text">
-            {stream.output || (
-              <span className="placeholder">Your translation will appear here.</span>
+      <div className="chat-main">
+        <div className="chat-scroll" ref={scrollRef}>
+          <div className="chat-column chat-width">
+            {conv.detailLoading && <p className="muted">대화를 불러오는 중…</p>}
+            {!conv.session && !conv.detailLoading && (
+              <div className="chat-empty">
+                <h2>Translation Studio Chat</h2>
+                <p>
+                  왼쪽에서 대화를 선택하거나 새 채팅을 시작하세요. llama.app
+                  JSONL 납출 파일을 그대로 가져올 수도 있습니다.
+                </p>
+                <p>
+                  입력창에서 프리셋을 선택하면 글로서리 탐지 + 프롬프트 빌더가
+                  적용된 번역 파이프라인으로 동작합니다.
+                </p>
+              </div>
+            )}
+            {path.map((message) => (
+              <MessageItem
+                key={message.id}
+                messages={conv.messages}
+                message={message}
+                busy={busy}
+                onNavigate={(leafId) => void conv.navigate(leafId)}
+                onEditBranch={(m, content) => void editBranch(m, content)}
+                onRegenerate={(m) => void regenerate(m)}
+              />
+            ))}
+            {busy && (
+              <div className="msg-row assistant">
+                <div className="msg-bubble">
+                  {(streamReasoning || prefs.showThoughtInProgress) && (
+                    <ThinkingBlock reasoning={streamReasoning} inProgress />
+                  )}
+                  <div className="msg-content streaming">
+                    {streamContent ? (
+                      <Markdown content={streamContent} />
+                    ) : (
+                      <span className="placeholder">생성하는 중…</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            {(sendError || conv.error) && (
+              <p className="error">{sendError || conv.error}</p>
             )}
           </div>
         </div>
-      </section>
-      <section className="lower-grid">
-        <AppliedGlossary detected={stream.detected} />
-        <div className="panel action-panel">
-          <div>
-            <p className="eyebrow">PROMPT CONTROL</p>
-            <h2>이번 요청 Prompt 보기</h2>
-            <p className="muted">
-              Review the exact messages and token count assembled for this request.
-            </p>
-          </div>
-          <button disabled={!source.trim()} onClick={() => void openPrompt()}>
-            {showPrompt ? "Refresh prompt" : "View prompt"}
-          </button>
-        </div>
-      </section>
-      {showPrompt && (
-        <section className="prompt-inline">
-          <PageHeader title="이번 요청 Prompt" detail="Exact assembled messages for the current source and preset." />
-          <PromptPreviewPanel
-            result={promptResult}
-            loading={promptBusy}
-            error={promptError}
-          />
-        </section>
-      )}
-    </>
+        <ChatInput
+          presets={presetsQuery.data?.presets ?? []}
+          preset={preset}
+          onPresetChange={setPreset}
+          thinkingEnabled={conv.session?.thinkingEnabled ?? false}
+          onToggleThinking={(enabled) => void conv.setThinkingEnabled(enabled)}
+          busy={busy}
+          onSend={(text) => void send(text)}
+        />
+      </div>
+    </section>
   );
 }

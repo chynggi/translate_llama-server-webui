@@ -122,6 +122,8 @@ def settings(tmp_path) -> Settings:
     logs_dir.mkdir()
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
+    conversations_dir = tmp_path / "conversations"
+    conversations_dir.mkdir()
     return Settings(
         llama_server=LlamaServerSettings(
             base_url="http://testserver", default_model="fake-model"
@@ -132,6 +134,7 @@ def settings(tmp_path) -> Settings:
             prompts_dir=prompts_dir,
             logs_dir=logs_dir,
             cache_dir=cache_dir,
+            conversations_dir=conversations_dir,
         ),
         server=ServerSettings(),
         detector=DetectorSettings(),

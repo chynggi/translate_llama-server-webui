@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 
 const navItems = [
-  ["/", "Translate"],
+  ["/", "Chat"],
   ["/projects", "Projects"],
   ["/glossary", "Glossary"],
   ["/presets", "Presets"],

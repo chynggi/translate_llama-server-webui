@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import DEFAULT_CONFIG_PATH, Settings
+from .conversations.repository import ConversationRepository
+from .conversations.service import ConversationService
 from .detector.service import DetectorService
 from .glossary.service import GlossaryService
 from .logs.logger import TranslationLogger
@@ -29,6 +31,7 @@ class Services:
     postprocessor: Postprocessor
     logger: TranslationLogger
     translation: TranslationService
+    conversations: ConversationService
     config_path: Path | None = DEFAULT_CONFIG_PATH
 
 
@@ -62,6 +65,9 @@ def build_services(
         logger=logger,
         settings=settings,
     )
+    conversations = ConversationService(
+        ConversationRepository(settings.paths.conversations_dir)
+    )
     return Services(
         settings=settings,
         llama_client=llama,
@@ -73,5 +79,6 @@ def build_services(
         postprocessor=postprocessor,
         logger=logger,
         translation=translation,
+        conversations=conversations,
         config_path=config_path,
     )

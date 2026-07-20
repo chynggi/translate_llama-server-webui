@@ -24,6 +24,11 @@ async def chat_completions(request: Request, services: Services = Depends(get_se
         body = services.translation.enrich_chat_payload(
             body, preset_id, user_instruction, glossary_set
         )
+    else:
+        # Pure passthrough, but fill in server-side sampling defaults;
+        # anything the caller sent always wins.
+        for key, value in services.settings.generation.to_payload_params().items():
+            body.setdefault(key, value)
     if body.get("stream"):
         return StreamingResponse(
             services.llama_client.chat_completions_stream_bytes(body),

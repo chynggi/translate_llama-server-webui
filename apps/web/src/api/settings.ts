@@ -1,5 +1,14 @@
 import { apiFetch } from "./client";
 
+/** llama.cpp sampling values; null means "not sent". */
+export type GenerationValues = Record<string, number | string | null>;
+
+export interface ChatFlags {
+  enable_thinking: boolean;
+  exclude_reasoning_from_context: boolean;
+  system_prompt_file: string;
+}
+
 export interface PublicSettings {
   llama_server: {
     base_url: string;
@@ -11,6 +20,8 @@ export interface PublicSettings {
     min_alias_length: number;
     longest_match_first: boolean;
   };
+  generation: GenerationValues;
+  chat: ChatFlags;
 }
 
 export interface SettingsUpdate {
@@ -24,6 +35,8 @@ export interface SettingsUpdate {
     min_alias_length?: number;
     longest_match_first?: boolean;
   };
+  generation?: GenerationValues;
+  chat?: Partial<ChatFlags>;
   persist?: boolean;
 }
 
